@@ -8,6 +8,11 @@ class MessageHandler {
       await whatsappService.markAsRead(message.id);
     }
   }
+
+  isGreeting(message) {
+    const greetings = ['hi', 'hello', 'hey'];
+  }
+
 }
 
 export default new MessageHandler();
