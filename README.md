@@ -1,6 +1,6 @@
-# MedPet - WhatsApp API with Express.js
+# WhatsApp API with Express.js
 
-MedPet is a Node.js application that integrates WhatsApp API using Express.js. It handles webhook events and provides messaging services for automating WhatsApp interactions.
+Node.js application that integrates WhatsApp API using Express.js. It handles webhook events and provides messaging services for automating WhatsApp interactions.
 
 ## Technologies Used
 - Node.js
