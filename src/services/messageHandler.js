@@ -1,6 +1,12 @@
 import whatsappService from './whatsappService.js';
+import appendToSheet from "./googleSheetsService.js"
 
 class MessageHandler {
+
+  constructor() {
+    this.appointmentState = {};
+  }
+
   async handleIncomingMessage(message, senderInfo) {
     if (message?.type === 'text') {
       const incomingMessage = message.text.body.toLowerCase().trim();
@@ -8,9 +14,12 @@ class MessageHandler {
       if (this.isGreeting(incomingMessage)) {
         await this.sendWelcomeMessage(message.from, message.id, senderInfo);
         await this.sendWelcomeMenu(message.from);
+      } else if (incomingMessage === "media") {
+        await this.sendMedia(message.from);
+      } else if (this.appointmentState[message.from]) {
+        await this.handleAppointmentFlow(message.from, incomingMessage);
       } else {
-        const response = `Echo: ${message.text.body}`;
-        await whatsappService.sendMessage(message.from, response, message.id);
+        await this.handleMenuOption(message.from, incomingMessage);
       }
       await whatsappService.markAsRead(message.id);
     } else if (message?.type === "interactive") {
@@ -57,7 +66,8 @@ class MessageHandler {
 
     switch (option) {
       case 'option_1':
-        response = 'Agendar Cita';
+        this.appointmentState[to] = { step: "name" }
+        response = 'Por favor, ingresa tu nombre:';
         break;
       case 'option_2':
         response = 'Realiza tu consulta';
@@ -72,6 +82,65 @@ class MessageHandler {
 
     await whatsappService.sendMessage(to, response);
   }
+
+  async sendMedia(to) {
+    const mediaUrl = "https://s3.amazonaws.com/gndx.dev/medpet-audio.aac";
+    const caption = "Bienvenida";
+    const type = "audio";
+    await whatsappService.sendMediaMessage(to, type, mediaUrl, caption);
+  }
+
+  completeAppointment(to) {
+    const appointment = this.appointmentState[to];
+    delete this.appointmentState[to];
+
+    const userData = [
+      to,
+      appointment.name,
+      appointment.email,
+      appointment.reason,
+      new Date().toISOString()
+    ]
+    
+    appendToSheet(userData);
+
+    return `Gracias por agendar tu cita.
+    Resumen de tu cita:
+    Nombre: ${appointment.name}
+    Email: ${appointment.email}
+    Razón: ${appointment.reason}
+    Nos pondremos en contacto contigo pronto, para confirmar
+    `;
+
+  }
+
+  async handleAppointmentFlow(to, message) {
+    const state = this.appointmentState[to];
+    let response;
+  
+    switch (state.step) {
+      case 'name':
+        state.name = message;
+        state.step = 'email';
+        response = "Por favor, indíquenos su dirección de correo electrónico.";
+        break;
+      case 'email':
+        state.email = message;
+        state.step = 'reason';
+        response = "¿Cuál es el motivo de su consulta?";
+        break;
+      case 'reason':
+        state.reason = message;
+        response = this.completeAppointment(to);
+        break;
+      default:
+        response = "Lo sentimos, se ha producido un error en el flujo. Por favor, inténtelo nuevamente.";
+        break;
+    }
+    await whatsappService.sendMessage(to, response);
+  }
+  
+
 
 }
 
